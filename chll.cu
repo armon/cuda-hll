@@ -25,6 +25,14 @@
 // Number of threads per block
 #define THREADS_PER_BLOCK 192
 
+// Define the number of HLL buckets, and prefix bits to use
+#define HLL_BUCKETS 1024
+#define HLL_PREFIX_BITS 10  // log2(HLL_BUCKETS)
+
+// How wide is each bucket
+#define HLL_BUCKET_WIDTH 5
+#define HLL_MAX_SCAN 32     // 2**HLL_BUCKET_WIDTH
+
 
 __host__ int read_input(char **inp, int *inp_len) {
     // Get the initial buffer
@@ -73,7 +81,6 @@ __host__ int read_input(char **inp, int *inp_len) {
 __global__ void hash_data(int n, char *in, char *out) {
     int offset = (blockIdx.x * blockDim.x + threadIdx.x);
     if (offset < n) {
-        printf("Offset: %d (%d)\n", offset, blockIdx.x);
         MurmurHash3_x64_128(in + (offset * PROCESS_LINE_WIDTH), INPUT_LINE_WIDTH, 0, out + (offset * HASH_WIDTH));
     }
 }
@@ -87,9 +94,6 @@ __host__ int main(int argc, char **argv) {
     if (read_input(&inp, &inp_len) || inp_len == 0)
         return 1;
 
-    // Print input bytes
-    printf("Read %d bytes\n\n", inp_len);
-
     // Move the data to the GPU
     printf("Copying to GPU...\n");
     char *gpu_in, *hashed;
@@ -102,7 +106,7 @@ __host__ int main(int argc, char **argv) {
     int blocks = ceil((float)n / (float)THREADS_PER_BLOCK);
 
     // Hash all the data for the HLL construction
-    printf("Hashing data... (%d lines, %d blocks)\n", n, blocks);
+    printf("Hashing data... (%d lines, %d blocks, %d threads)\n", n, blocks, THREADS_PER_BLOCK);
     hash_data<<<blocks, THREADS_PER_BLOCK>>>(n, gpu_in, hashed);
     cudaError_t res = cudaDeviceSynchronize();
     if (res != cudaSuccess) {
