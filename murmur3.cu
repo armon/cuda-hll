@@ -6,6 +6,11 @@
 // algorithms are optimized for their respective platforms. You can still
 // compile and run any of them on any platform, but your performance with the
 // non-native version will be less than optimal.
+
+/*
+ * This version is taken from https://github.com/PeterScott/murmur3
+ * and modified to work with CUDA.
+ */
 #include <stdint.h>
 
 //-----------------------------------------------------------------------------
