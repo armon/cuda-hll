@@ -27,8 +27,8 @@
 #define THREADS_PER_BLOCK 192
 
 // Define the number of HLL buckets, and prefix bits to use
-#define HLL_BUCKETS 1024
-#define HLL_PREFIX_BITS 10  // log2(HLL_BUCKETS)
+#define HLL_BUCKETS 2048
+#define HLL_PREFIX_BITS 11  // log2(HLL_BUCKETS)
 
 // How wide is each bucket
 #define HLL_BUCKET_WIDTH 6
@@ -148,18 +148,18 @@ __global__ void extract_hll(int n, char *in, char *out) {
             position = min(position, HLL_MAX_SCAN) - 1;
 
         // Update the output
-        uint16_t *outp = ((uint16_t*)out) + offset;
+        unsigned int *outp = ((unsigned int*)out) + offset;
         *outp = ((bucket << HLL_BUCKET_WIDTH) | position);
     }
 }
 
 
 // Uses a two dimensional grid to build the HLL
-__global__ void build_hll(int n, uint16_t *in, unsigned int *out) {
+__global__ void build_hll(int n, unsigned int *in, unsigned int *out) {
     int offset = (blockIdx.x * blockDim.x + threadIdx.x);
     if (offset < n) {
         // Extract the parts
-        uint16_t val = *(in + offset);
+        unsigned int val = *(in + offset);
         int bucket = val >> HLL_BUCKET_WIDTH;
 
         // Update the maximum position
@@ -211,7 +211,7 @@ __host__ int main(int argc, char **argv) {
     gettimeofday(&end, NULL);
     printf("+%d msec: Extracting HLL values...\n", timediff(&start, &end));
     char *hll_vals;
-    cudaMalloc((void**)&hll_vals, n * 2);
+    cudaMalloc((void**)&hll_vals, n * sizeof(unsigned int));
     extract_hll<<<blocks, THREADS_PER_BLOCK>>>(n, hashed, hll_vals);
     res = cudaDeviceSynchronize();
     cudaFree(hashed);
@@ -230,7 +230,7 @@ __host__ int main(int argc, char **argv) {
     cudaMalloc((void**)&hll, hll_size);
     cudaMemcpy(hll, host_hll, hll_size, cudaMemcpyHostToDevice);
 
-    build_hll<<<blocks, THREADS_PER_BLOCK>>>(n, (uint16_t*)hll_vals, hll);
+    build_hll<<<blocks, THREADS_PER_BLOCK>>>(n, (unsigned int*)hll_vals, hll);
     res = cudaDeviceSynchronize();
     cudaFree(hll_vals);
     if (res != cudaSuccess) {
