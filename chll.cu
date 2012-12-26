@@ -86,18 +86,15 @@ __host__ int read_input(char **inp, int *inp_len) {
     int offset = 0;
     int in;
     while (1) {
-        in = read(STDIN_FILENO, buf+offset, INPUT_LINE_WIDTH+1);
+        in = fread(buf+offset, INPUT_LINE_WIDTH+1, 1, stdin);
         if (in == 0) break;
         else if (in < 0) {
             perror("Failed to read input!\n");
             free(buf);
             return 1;
-        } else if (in == INPUT_LINE_WIDTH + 1) {
+        } else if (in == 1) {
             offset += INPUT_LINE_WIDTH;
-            *(buf+offset) = 0;
-            *(buf+offset+1) = 0;
-            *(buf+offset+2) = 0;
-            *(buf+offset+3) = 0;
+            memset(buf+offset, 0, 4);
             offset += 4;
         } else {
             printf("Input is not %d byte aligned!\n", INPUT_LINE_WIDTH);
