@@ -188,6 +188,7 @@ __host__ int main(int argc, char **argv) {
     char *gpu_in, *hashed;
     cudaMalloc((void**)&gpu_in, inp_len);
     cudaMemcpy(gpu_in, inp, inp_len, cudaMemcpyHostToDevice);
+    free(inp);
 
     // Determine block sets
     int n = inp_len / PROCESS_LINE_WIDTH;
@@ -252,7 +253,7 @@ __host__ int main(int argc, char **argv) {
     // Cleanup
     gettimeofday(&end, NULL);
     printf("+%d msec: Cleanup...\n", timediff(&start, &end));
-    free(inp);
+    free(host_hll);
     cudaFree(hll);
 
     // Finish
