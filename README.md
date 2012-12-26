@@ -12,7 +12,7 @@ perform the hashing and parameter extraction of the HLL inputs in parallel.
 Install
 -------
 
-Download and build from source::
+Download and build from source:
 
     $ git clone https://armon@github.com/armon/cuda-hll.git
     $ cd cuda-hll
@@ -28,7 +28,7 @@ seperated by a newline (or any terminator). The 36 byte width corresponds with
 a UUID. This can be easily tweaked in the constants, but it is a limitation of
 the concept.
 
-To generate some sample UUID's in Python, do::
+To generate some sample UUID's in Python, do:
 
     $ python
     > import uuid
@@ -40,11 +40,11 @@ To generate some sample UUID's in Python, do::
     > exit()
 
 
-Then, once you are in the shell, you can invoke chll with the sample inputs::
+Then, once you are in the shell, you can invoke chll with the sample inputs:
 
     $ ./chll < sample.txt
 
-You should be presented with an output like the following::
+You should be presented with an output like the following:
 
     Reading input...
     +7 msec: Copying to GPU...
@@ -60,10 +60,9 @@ You should be presented with an output like the following::
 Performance
 ------------
 
-
 Casual benchmarks were performed between 3 variations of this on a 2012 rMBP.
 The first benchmark was the CHLL tool itself, the second was a non-CUDA
-version (HLL), and the third was a simple awk script::
+version (HLL), and the third was a simple awk script:
 
     awk '{ if (!($1 in s)) { s[$1]=1; c++; }} END { print "Count", c; }'
 
@@ -90,7 +89,7 @@ The results are as follows:
 Troubleshooting
 ---------------
 
-It is important to know that for CHLL to function, the CUDA runtime environment
+For CHLL to function the CUDA runtime environment
 must be setup, and the computer must have a CUDA-enabled device. Otherwise,
 and error like the following will occur::
 
@@ -103,6 +102,6 @@ and error like the following will occur::
 References
 -----------
 
-* [Nvidia CUDA](http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf)
+* [Nvidia CUDA](http://www.nvidia.com/object/cuda_home_new.html)
 * [HyperLogLog](http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf)
 
