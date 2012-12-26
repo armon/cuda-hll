@@ -46,12 +46,12 @@ static double raw_estimate(unsigned int *inp) {
     for (int i=0; i<HLL_BUCKETS;i++) {
         inv_sum += 1 / pow(2.0, (int)inp[i]);
     }
-    return (1 / inv_sum) * multi;
+    return (1.0 / inv_sum) * multi;
 }
 
 
 static double range_corrected(double raw, unsigned int *inp) {
-    if (raw < (5/2)*HLL_BUCKETS) {
+    if (raw < 5*HLL_BUCKETS/2) {
         int numzero = 0;
         for (int i=0; i < HLL_BUCKETS; i++) {
             if (inp[i] == 0) numzero++;
@@ -61,7 +61,7 @@ static double range_corrected(double raw, unsigned int *inp) {
         else
             return HLL_BUCKETS * log(HLL_BUCKETS / numzero);
 
-    } else if (raw > (1/30)*TWO_32) {
+    } else if (raw > TWO_32/30) {
         return -1*TWO_32*log(1 - (raw / TWO_32));
     } else {
         return raw;
