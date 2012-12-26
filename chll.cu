@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/time.h>
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include "murmur3.cu"
@@ -34,6 +35,14 @@
 #define HLL_MAX_SCAN 64     // 2**HLL_BUCKET_WIDTH
 
 #define TWO_32 4294967296 // 2**32
+
+
+static int timediff(struct timeval *t1, struct timeval *t2) {
+    uint64_t micro1 = t1->tv_sec * 1000000 + t1->tv_usec;
+    uint64_t micro2= t2->tv_sec * 1000000 + t2->tv_usec;
+    return (micro2-micro1) / 1000;
+}
+
 
 static double alpha() {
     return 0.7213/(1 + 1.079/HLL_BUCKETS);
@@ -150,31 +159,25 @@ __global__ void extract_hll(int n, char *in, char *out) {
 
 // Uses a two dimensional grid to build the HLL
 __global__ void build_hll(int n, uint16_t *in, unsigned int *out) {
-    __shared__ int maxPos;
-    maxPos = 0;
-    __syncthreads();
-    int offset = (blockIdx.y * blockDim.y + blockIdx.x * blockDim.x + threadIdx.x);
-
+    int offset = (blockIdx.x * blockDim.x + threadIdx.x);
     if (offset < n) {
         // Extract the parts
         uint16_t val = *(in + offset);
         int bucket = val >> HLL_BUCKET_WIDTH;
 
-        // Only continue if the bucket matches the y index
-        if (bucket != blockIdx.y) return;
-
         // Update the maximum position
         int pos = val & ((1 << HLL_BUCKET_WIDTH) - 1);
-        atomicMax(&maxPos, pos);
 
         // Wait for all the maximums to be sync'd
-        __syncthreads();
-        atomicMax(&out[blockIdx.y], maxPos);
+        atomicMax(&out[bucket], pos);
     }
 }
 
 
 __host__ int main(int argc, char **argv) {
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+
     // Read the input
     printf("Reading input...\n");
     char *inp;
@@ -183,7 +186,8 @@ __host__ int main(int argc, char **argv) {
         return 1;
 
     // Move the data to the GPU
-    printf("Copying to GPU...\n");
+    gettimeofday(&end, NULL);
+    printf("+%d msec: Copying to GPU...\n", timediff(&start, &end));
     char *gpu_in, *hashed;
     cudaMalloc((void**)&gpu_in, inp_len);
     cudaMemcpy(gpu_in, inp, inp_len, cudaMemcpyHostToDevice);
@@ -194,7 +198,9 @@ __host__ int main(int argc, char **argv) {
     int blocks = ceil((float)n / (float)THREADS_PER_BLOCK);
 
     // Hash all the data for the HLL construction
-    printf("Hashing data... (%d lines, %d blocks, %d threads)\n", n, blocks, THREADS_PER_BLOCK);
+    gettimeofday(&end, NULL);
+    printf("+%d msec: Hashing data... (%d lines, %d blocks, %d threads)\n",
+            timediff(&start, &end), n, blocks, THREADS_PER_BLOCK);
     hash_data<<<blocks, THREADS_PER_BLOCK>>>(n, gpu_in, hashed);
     cudaError_t res = cudaDeviceSynchronize();
     if (res != cudaSuccess) {
@@ -203,7 +209,8 @@ __host__ int main(int argc, char **argv) {
     }
 
     // Extract the HLL's values
-    printf("Extracting HLL values...\n");
+    gettimeofday(&end, NULL);
+    printf("+%d msec: Extracting HLL values...\n", timediff(&start, &end));
     char *hll_vals;
     cudaMalloc((void**)&hll_vals, n * 2);
     extract_hll<<<blocks, THREADS_PER_BLOCK>>>(n, hashed, hll_vals);
@@ -214,7 +221,8 @@ __host__ int main(int argc, char **argv) {
     }
 
     // Build the HLL's
-    printf("Building HLL...\n");
+    gettimeofday(&end, NULL);
+    printf("+%d msec: Building HLL...\n", timediff(&start, &end));
     int hll_size = HLL_BUCKETS * sizeof(unsigned int);
     unsigned int *hll;
     unsigned int *host_hll = (unsigned int*)malloc(hll_size);
@@ -222,8 +230,7 @@ __host__ int main(int argc, char **argv) {
     cudaMalloc((void**)&hll, hll_size);
     cudaMemcpy(hll, host_hll, hll_size, cudaMemcpyHostToDevice);
 
-    dim3 dimGrid(blocks, HLL_BUCKETS);
-    build_hll<<<dimGrid, THREADS_PER_BLOCK>>>(n, (uint16_t*)hll_vals, hll);
+    build_hll<<<blocks, THREADS_PER_BLOCK>>>(n, (uint16_t*)hll_vals, hll);
     res = cudaDeviceSynchronize();
     if (res != cudaSuccess) {
         printf("HLL construction failed: %s\n", cudaGetErrorString(res));
@@ -231,20 +238,29 @@ __host__ int main(int argc, char **argv) {
     }
 
     // Copy the HLL back
+    gettimeofday(&end, NULL);
+    printf("+%d msec: Copying HLL...\n", timediff(&start, &end));
     cudaMemcpy(host_hll, hll, hll_size, cudaMemcpyDeviceToHost);
 
     // Estimate cardinality
-    printf("Estimating cardinality...\n");
+    gettimeofday(&end, NULL);
+    printf("+%d msec: Estimating cardinality...\n", timediff(&start, &end));
     double raw = raw_estimate(host_hll);
     double adj = range_corrected(raw, host_hll);
     printf("Est: %0.1f Raw: %0.1f\n", adj, raw);
 
     // Cleanup
-    printf("Cleanup...\n");
+    gettimeofday(&end, NULL);
+    printf("+%d msec: Cleanup...\n", timediff(&start, &end));
     free(inp);
     cudaFree(gpu_in);
     cudaFree(hashed);
+    cudaFree(hll_vals);
+    cudaFree(hll);
 
+    // Finish
+    gettimeofday(&end, NULL);
+    printf("+%d msec: Done\n", timediff(&start, &end));
     return 0;
 }
 
