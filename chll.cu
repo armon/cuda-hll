@@ -200,6 +200,7 @@ __host__ int main(int argc, char **argv) {
             timediff(&start, &end), n, blocks, THREADS_PER_BLOCK);
     hash_data<<<blocks, THREADS_PER_BLOCK>>>(n, gpu_in, hashed);
     cudaError_t res = cudaDeviceSynchronize();
+    cudaFree(gpu_in);
     if (res != cudaSuccess) {
         printf("Hashing failed: %s\n", cudaGetErrorString(res));
         return 1;
@@ -212,6 +213,7 @@ __host__ int main(int argc, char **argv) {
     cudaMalloc((void**)&hll_vals, n * 2);
     extract_hll<<<blocks, THREADS_PER_BLOCK>>>(n, hashed, hll_vals);
     res = cudaDeviceSynchronize();
+    cudaFree(hashed);
     if (res != cudaSuccess) {
         printf("HLL extraction failed: %s\n", cudaGetErrorString(res));
         return 1;
@@ -229,6 +231,7 @@ __host__ int main(int argc, char **argv) {
 
     build_hll<<<blocks, THREADS_PER_BLOCK>>>(n, (uint16_t*)hll_vals, hll);
     res = cudaDeviceSynchronize();
+    cudaFree(hll_vals);
     if (res != cudaSuccess) {
         printf("HLL construction failed: %s\n", cudaGetErrorString(res));
         return 1;
@@ -250,9 +253,6 @@ __host__ int main(int argc, char **argv) {
     gettimeofday(&end, NULL);
     printf("+%d msec: Cleanup...\n", timediff(&start, &end));
     free(inp);
-    cudaFree(gpu_in);
-    cudaFree(hashed);
-    cudaFree(hll_vals);
     cudaFree(hll);
 
     // Finish
