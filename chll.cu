@@ -44,7 +44,7 @@ static double raw_estimate(unsigned int *inp) {
     double multi = alpha() * HLL_BUCKETS * HLL_BUCKETS;
     double inv_sum = 0;
     for (int i=0; i<HLL_BUCKETS;i++) {
-        inv_sum += 1 / pow(2.0, (int)inp[i]);
+        inv_sum += 1 / pow(2.0, (int)inp[i] + 1);
     }
     return (1.0 / inv_sum) * multi;
 }
